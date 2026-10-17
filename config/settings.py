@@ -12,12 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from environs import Env
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / ".env")
 env = Env()
-env.read_env(BASE_DIR / ".env", recurse=False)
 
 SECRET_KEY = env.str("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
@@ -71,8 +72,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": env.dj_db_url("DATABASE_URL", conn_max_age=60),
+    "default": env.dj_db_url("DATABASE_URL"),
 }
+DATABASES["default"]["OPTIONS"] = {"pool": True}
 
 
 # Password validation
@@ -115,3 +117,16 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+        "otel": {"class": "opentelemetry.sdk._logs.LoggingHandler"},
+    },
+    "root": {"handlers": ["console", "otel"], "level": "INFO"},
+    "loggers": {
+        "opentelemetry": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}
