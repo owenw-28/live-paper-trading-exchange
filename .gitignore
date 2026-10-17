@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Local config and data
+.env
+db.sqlite3
+staticfiles/
+
+# OS / editor
+.DS_Store
+.vscode/
