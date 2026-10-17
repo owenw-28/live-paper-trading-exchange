@@ -22,6 +22,7 @@ env.read_env(BASE_DIR / ".env", recurse=False)
 SECRET_KEY = env.str("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+OTEL_ENABLED = env.bool("OTEL_ENABLED", default=False)
 
 
 # Application definition
