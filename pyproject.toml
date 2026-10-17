@@ -8,6 +8,7 @@ dependencies = [
     "environs[django]>=15.2.0",
     "opentelemetry-exporter-otlp-proto-http>=1.45.1",
     "opentelemetry-instrumentation-django[asgi]>=0.66b1",
+    "opentelemetry-instrumentation-logging>=0.66b1",
     "opentelemetry-instrumentation-psycopg>=0.66b1",
     "opentelemetry-sdk>=1.45.1",
     "psycopg[binary,pool]>=3.3.6",

@@ -123,7 +123,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {
         "console": {"class": "logging.StreamHandler"},
-        "otel": {"class": "opentelemetry.sdk._logs.LoggingHandler"},
+        "otel": {"class": "opentelemetry.instrumentation.logging.handler.LoggingHandler"},
     },
     "root": {"handlers": ["console", "otel"], "level": "INFO"},
     "loggers": {

@@ -37,5 +37,10 @@ def configure_telemetry(service_name: str) -> None:
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
     set_logger_provider(logger_provider)
 
+    instrument_libraries()
+
+
+def instrument_libraries() -> None:
+    """Patch the libraries we trace. Must run before the first database connection is opened."""
     DjangoInstrumentor().instrument()
     PsycopgInstrumentor().instrument()
