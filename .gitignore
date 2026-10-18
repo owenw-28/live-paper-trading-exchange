@@ -16,3 +16,6 @@ staticfiles/
 # OS / editor
 .DS_Store
 .vscode/
+
+# Recorded market data
+recordings/
