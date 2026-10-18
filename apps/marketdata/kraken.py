@@ -29,7 +29,7 @@ class BookTracker:
     """Keeps one verified OrderBook per symbol from Kraken book messages.
 
     A symbol is only tracked between a snapshot and the first checksum mismatch. After a
-    mismatch its book is discards, and updates are ignored until a fresh snapshot arrives.
+    mismatch its book is discarded, and updates are ignored until a fresh snapshot arrives.
     """
 
     def __init__(self, depth: int = 10) -> None:
