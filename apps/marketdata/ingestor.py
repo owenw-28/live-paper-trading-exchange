@@ -5,11 +5,13 @@ import logging
 import random
 import time
 
-from opentelemetry import metrics
+from opentelemetry import metrics, trace
 from opentelemetry.metrics import CallbackOptions, Observation
+from opentelemetry.trace import SpanKind
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake
 
+from apps.marketdata.events import book_event, encode, trade_event
 from apps.marketdata.kraken import (
     URL,
     BookTracker,
@@ -17,9 +19,12 @@ from apps.marketdata.kraken import (
     subscribe_message,
     unsubscribe_message,
 )
+from apps.marketdata.publisher import Publisher
+from apps.marketdata.topics import BOOK, KRAKEN_RAW, TRADES, instrument_key
 
 logger = logging.getLogger(__name__)
 meter = metrics.get_meter(__name__)
+tracer = trace.get_tracer(__name__)
 
 messages_received = meter.create_counter(
     "marketdata.messages", description="Messages received from the venue"
@@ -47,12 +52,14 @@ class KrakenIngestor:
     def __init__(
         self,
         symbols: list[str],
+        publisher: Publisher,
         depth: int = 10,
         url: str = URL,
         stale_after: float = 10.0,
         healthy_after: float = 60.0,
     ) -> None:
         self.symbols = symbols
+        self.publisher = publisher
         self.depth = depth
         self.url = url
         self.stale_after = stale_after
@@ -94,20 +101,46 @@ class KrakenIngestor:
                 except TimeoutError:
                     raise StaleFeedError(f"no message for {self.stale_after}s") from None
                 self._last_message_at = time.monotonic()
-                await self._handle(ws, parse_message(raw))
+                await self._handle(ws, raw)
 
-    async def _handle(self, ws, message: dict) -> None:
+    async def _handle(self, ws, raw: str) -> None:
+        message = parse_message(raw)
         channel = message.get("channel") or message.get("method", "unknown")
         messages_received.add(1, {"venue": "kraken", "channel": channel})
+        self.publisher.publish(KRAKEN_RAW.name, _raw_key(message), raw.encode())
 
         if message.get("method") in ("subscribe", "unsubscribe") and not message.get("success"):
             logger.error("Kraken rejected %s: %s", message["method"], message.get("error"))
-        elif message.get("channel") == "book":
-            for symbol in self.tracker.handle(message):
-                logger.warning("Checksum mismatch for %s; resyncing", symbol)
-                resyncs.add(1, {"venue": "kraken", "symbol": symbol})
-                await ws.send(unsubscribe_message("book", [symbol], depth=self.depth))
-                await ws.send(subscribe_message("book", [symbol], depth=self.depth))
+        elif channel == "book":
+            with tracer.start_as_current_span("kraken book", kind=SpanKind.PRODUCER):
+                await self._handle_book(ws, message)
+        elif channel == "trade":
+            with tracer.start_as_current_span("kraken trade", kind=SpanKind.PRODUCER):
+                for trade in message["data"]:
+                    key = instrument_key("kraken", trade["symbol"])
+                    self.publisher.publish(TRADES.name, key, encode(trade_event("kraken", trade)))
+
+    async def _handle_book(self, ws, message: dict) -> None:
+        failed = self.tracker.handle(message)
+        for data in message["data"]:
+            book = self.tracker.books.get(data["symbol"])
+            if book is not None:
+                event = book_event("kraken", book, data["timestamp"])
+                self.publisher.publish(
+                    BOOK.name, instrument_key("kraken", book.symbol), encode(event)
+                )
+        for symbol in failed:
+            logger.warning("Checksum mismatch for %s; resyncing", symbol)
+            resyncs.add(1, {"venue": "kraken", "symbol": symbol})
+            await ws.send(unsubscribe_message("book", [symbol], depth=self.depth))
+            await ws.send(subscribe_message("book", [symbol], depth=self.depth))
 
     def _observe_staleness(self, options: CallbackOptions):
         yield Observation(time.monotonic() - self._last_message_at, {"venue": "kraken"})
+
+
+def _raw_key(message: dict) -> str | None:
+    data = message.get("data")
+    if isinstance(data, list) and data and "symbol" in data[0]:
+        return instrument_key("kraken", data[0]["symbol"])
+    return None

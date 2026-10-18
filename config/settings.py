@@ -24,6 +24,8 @@ SECRET_KEY = env.str("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 OTEL_ENABLED = env.bool("OTEL_ENABLED", default=False)
+KAFKA_BOOTSTRAP_SERVERS = env.str("KAFKA_BOOTSTRAP_SERVERS", default="localhost:19092")
+KAFKA_REPLICATION_FACTOR = env.int("KAFKA_REPLICATION_FACTOR", default=1)
 MARKETDATA_SYMBOLS = env.list("MARKETDATA_SYMBOLS", default=["BTC/USD", "ETH/USD"])
 
 
