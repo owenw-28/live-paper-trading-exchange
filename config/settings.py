@@ -27,6 +27,8 @@ OTEL_ENABLED = env.bool("OTEL_ENABLED", default=False)
 KAFKA_BOOTSTRAP_SERVERS = env.str("KAFKA_BOOTSTRAP_SERVERS", default="localhost:19092")
 KAFKA_REPLICATION_FACTOR = env.int("KAFKA_REPLICATION_FACTOR", default=1)
 MARKETDATA_SYMBOLS = env.list("MARKETDATA_SYMBOLS", default=["BTC/USD", "ETH/USD"])
+MARKETDATA_MAX_BOOKS_PER_SECOND = env.float("MARKETDATA_MAX_BOOKS_PER_SECOND", default=10.0)
+REDIS_URL = env.str("REDIS_URL", default="redis://localhost:6379/0")
 ARCHIVE_ROOT = env.path("ARCHIVE_ROOT", default=BASE_DIR / "archive")
 ARCHIVE_SEGMENT_SECONDS = env.float("ARCHIVE_SEGMENT_SECONDS", default=60.0)
 
@@ -72,6 +74,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [REDIS_URL]},
+    }
+}
 
 
 # Database
