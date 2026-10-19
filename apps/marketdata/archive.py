@@ -18,8 +18,7 @@ from pathlib import Path
 
 import zstandard
 
-SEGMENT_NAME = re.compile(f"offsets-(\d{12})-(\d{12})\.jsonl\.zst")
-
+SEGMENT_NAME = re.compile(r"offsets-(\d{12})-(\d{12})\.jsonl\.zst")
 
 
 @dataclass(frozen=True)
@@ -150,7 +149,7 @@ class Archive:
     def finish_due(self) -> list[Segment]:
         now = time.monotonic()
         due = [p for p, writer in self.writers.items() if now - writer.opened_at >= self.max_age_s]
-        return [self.finish(partition)for partition in due]
+        return [self.finish(partition) for partition in due]
 
     def finish_all(self) -> list[Segment]:
         return [self.finish(partition) for partition in list(self.writers)]
@@ -174,7 +173,6 @@ class Archive:
             writer.abandon()
 
 
-
 def segment_range(path: Path) -> tuple[int, int]:
     match = SEGMENT_NAME.fullmatch(path.name)
     if match is None:
@@ -182,8 +180,14 @@ def segment_range(path: Path) -> tuple[int, int]:
     return int(match[1]), int(match[2])
 
 
+def read_segment(path: Path) -> Iterator[dict]:
+    with path.open("rb") as f, zstandard.ZstdDecompressor().stream_reader(f) as reader:
+        for line in io.TextIOWrapper(reader, encoding="utf-8"):
+            yield json.loads(line)
+
+
 def _fsync_directory(path: Path) -> None:
-    """Force bytes onto disk, not on OS memory where it can be lost."""
+    """Make a rename inside this directory durable, not just visible."""
     fd = os.open(path, os.O_RDONLY)
     try:
         os.fsync(fd)

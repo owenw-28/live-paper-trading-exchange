@@ -66,6 +66,8 @@ services:
       - "3000:3000"   # Grafana UI
       - "4317:4317"   # OTLP over gRPC
       - "4318:4318"   # OTLP over HTTP
+    volumes:
+      - ./observability/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro
 
 volumes:
   pgdata:

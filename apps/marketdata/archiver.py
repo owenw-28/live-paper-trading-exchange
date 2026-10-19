@@ -10,7 +10,7 @@ from apps.marketdata.archive import Archive, Segment
 logger = logging.getLogger(__name__)
 meter = metrics.get_meter(__name__)
 
-archived_messages = meter.creater_counter(
+archived_messages = meter.create_counter(
     "archive.messages", description="Messages written into published segments"
 )
 archived_segments = meter.create_counter("archive.segments", description="Segments published")
@@ -77,4 +77,3 @@ class Archiver:
         for tp in partitions:
             self.archive.abandon(tp.partition)
         logger.info("Revoked partitions %s", [tp.partition for tp in partitions])
-        
