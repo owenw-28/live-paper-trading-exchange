@@ -19,3 +19,4 @@ staticfiles/
 
 # Recorded market data
 recordings/
+archive/

@@ -27,6 +27,8 @@ OTEL_ENABLED = env.bool("OTEL_ENABLED", default=False)
 KAFKA_BOOTSTRAP_SERVERS = env.str("KAFKA_BOOTSTRAP_SERVERS", default="localhost:19092")
 KAFKA_REPLICATION_FACTOR = env.int("KAFKA_REPLICATION_FACTOR", default=1)
 MARKETDATA_SYMBOLS = env.list("MARKETDATA_SYMBOLS", default=["BTC/USD", "ETH/USD"])
+ARCHIVE_ROOT = env.path("ARCHIVE_ROOT", default=BASE_DIR / "archive")
+ARCHIVE_SEGMENT_SECONDS = env.float("ARCHIVE_SEGMENT_SECONDS", default=60.0)
 
 
 # Application definition
