@@ -1,5 +1,28 @@
 name: paper-exchange
 
+x-app: &app
+  image: paper-exchange-app
+  pull_policy: never # built locally by the init service
+  profiles: [app]
+  restart: unless-stopped
+  environment:
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env}
+    DJANGO_DEBUG: "false"
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+    DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    REDIS_URL: redis://redis:6379/0
+    KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+    ARCHIVE_ROOT: /data/archive
+    OTEL_ENABLED: "true"
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://observability:4318
+    OTEL_METRIC_EXPORT_INTERVAL: "10000"
+    OTEL_SEMCONV_STABILITY_OPT_IN: http
+  depends_on:
+    init:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
 services:
   postgres:
     image: timescale/timescaledb-ha:pg17.11-ts2.30.2
@@ -69,6 +92,65 @@ services:
     volumes:
       - ./observability/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro
 
+  redpanda-config:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.5
+    profiles: [app]
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        rpk cluster config set enable_consumer_group_metrics '["group","partition","consumer_lag"]' -X admin.hosts=redpanda:9644 &&
+        rpk cluster config set consumer_group_lag_collection_interval_sec 10 -X admin.hosts=redpanda:9644
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  init:
+    <<: *app
+    build: .
+    pull_policy: build
+    restart: "no"
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py create_topics"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      redpanda-config:
+        condition: service_completed_successfully
+
+  web:
+    <<: *app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ingestor:
+    <<: *app
+    command: ["python", "manage.py", "run_ingestor"]
+
+  archiver:
+    <<: *app
+    command: ["python", "manage.py", "run_archiver"]
+    volumes:
+      - archive-data:/data/archive
+
+  fanout:
+    <<: *app
+    command: ["python", "manage.py", "run_fanout"]
+
+  caddy:
+    build: ./frontend
+    image: paper-exchange-frontend
+    profiles: [app]
+    ports:
+      - "${APP_PORT:-8081}:80"
+    depends_on:
+      web:
+        condition: service_healthy
+
 volumes:
   pgdata:
   redpanda-data:
+  archive-data:
