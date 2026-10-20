@@ -7,12 +7,14 @@ current market, and every book event is a complete book, so skipping old ones lo
 import asyncio
 import json
 import logging
+import time
 
 from confluent_kafka import OFFSET_END, Consumer, Message, TopicPartition
 from opentelemetry import metrics, trace
 from opentelemetry.propagate import extract
 from opentelemetry.trace import SpanKind
 
+from apps.marketdata.latency import LATENCY_BUCKETS_S
 from apps.marketdata.live import LiveState, frame, group_name
 from apps.marketdata.topics import BOOK, TRADES
 
@@ -24,6 +26,12 @@ delivered = meter.create_counter("fanout.delivered", description="Events sent to
 coalesced = meter.create_counter(
     "fanout.books_coalesced",
     description="Books skipped because a newer book for the same instrument was in the batch",
+)
+ingest_to_broadcast = meter.create_histogram(
+    "marketdata.ingest_to_broadcast",
+    unit="s",
+    description="Time from the ingestor receiving an event to the fan-out broadcasting it",
+    explicit_bucket_boundaries_advisory=LATENCY_BUCKETS_S,
 )
 
 
@@ -93,6 +101,8 @@ class Fanout:
                 },
             )
         delivered.add(1, {"kind": kind})
+        latency_s = (time.time_ns() - event["ingested_at_ns"]) / 1e9
+        ingest_to_broadcast.record(latency_s, {"kind": kind})
 
 
 def _start_at_newest(consumer: Consumer, partitions: list[TopicPartition]) -> None:

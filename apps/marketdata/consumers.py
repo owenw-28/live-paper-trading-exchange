@@ -9,6 +9,7 @@ from django.conf import settings
 from opentelemetry import metrics
 
 from apps.marketdata.conflation import ClientQueue
+from apps.marketdata.latency import LATENCY_BUCKETS_S
 from apps.marketdata.live import LiveState, group_name
 from apps.marketdata.topics import instrument_key
 
@@ -26,24 +27,7 @@ ingest_to_send = meter.create_histogram(
     "marketdata.ingest_to_send",
     unit="s",
     description="Time from the ingestor receiving an event to it being sent to a client",
-    explicit_bucket_boundaries_advisory=[
-        0.0005,
-        0.001,
-        0.002,
-        0.003,
-        0.005,
-        0.0075,
-        0.01,
-        0.015,
-        0.02,
-        0.03,
-        0.05,
-        0.075,
-        0.1,
-        0.2,
-        0.5,
-        1.0,
-    ],
+    explicit_bucket_boundaries_advisory=LATENCY_BUCKETS_S,
 )
 
 

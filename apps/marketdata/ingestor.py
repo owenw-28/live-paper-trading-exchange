@@ -38,6 +38,10 @@ resyncs = meter.create_counter(
     "marketdata.resyncs", description="Books discarded after a checksum mismatch"
 )
 
+malformed = meter.create_counter(
+    "marketdata.malformed", description="Messages from the venue that were not valid JSON"
+)
+
 
 class StaleFeedError(Exception):
     """No message arrived within the staleness window."""
@@ -104,7 +108,13 @@ class KrakenIngestor:
                 await self._handle(ws, raw)
 
     async def _handle(self, ws, raw: str) -> None:
-        message = parse_message(raw)
+        try:
+            message = parse_message(raw)
+        except ValueError:
+            self.publisher.publish(KRAKEN_RAW.name, None, raw.encode())
+            malformed.add(1, {"venue": "kraken"})
+            logger.error("Unparseable message from Kraken: %.200s", raw)
+            return
         channel = message.get("channel") or message.get("method", "unknown")
         messages_received.add(1, {"venue": "kraken", "channel": channel})
         self.publisher.publish(KRAKEN_RAW.name, _raw_key(message), raw.encode())

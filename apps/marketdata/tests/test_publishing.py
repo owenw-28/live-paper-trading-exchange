@@ -16,7 +16,11 @@ class FakePublisher:
         self.sent: list[tuple[str, str | None, dict]] = []
 
     def publish(self, topic: str, key: str | None, value: bytes) -> None:
-        self.sent.append((topic, key, json.loads(value)))
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            decoded = value.decode()  # malformed messages are archived as raw text
+        self.sent.append((topic, key, decoded))
 
     def on(self, topic: str) -> list[tuple[str | None, dict]]:
         return [(key, value) for t, key, value in self.sent if t == topic]
@@ -94,3 +98,10 @@ def test_no_book_published_for_symbol_between_mismatch_and_new_snapshot():
     assert all(m["params"]["symbol"] == ["BTC/USD"] for m in ws.sent)
     btc_books = [v for k, v in publisher.on("marketdata.book") if k == "kraken:BTC/USD"]
     assert len(btc_books) == 1
+
+
+def test_malformed_message_is_archived_without_crashing():
+    publisher, _ = feed(["this is not JSON {"])
+
+    assert publisher.on("marketdata.kraken.raw") == [(None, "this is not JSON {")]
+    assert publisher.on("marketdata.book") == []

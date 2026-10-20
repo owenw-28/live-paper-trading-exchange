@@ -107,3 +107,12 @@ def test_assigned_partitions_start_at_the_newest_message():
     _start_at_newest(consumer, [TopicPartition("marketdata.book", 4, 1234)])
 
     assert [(tp.partition, tp.offset) for tp in consumer.assigned] == [(4, OFFSET_END)]
+
+
+def test_fanout_records_ingest_to_broadcast_latency(histogram_counts):
+    asyncio.run(deliver([book(1), book(2), trade(10)]))
+
+    assert histogram_counts("marketdata.ingest_to_broadcast") == {
+        (("kind", "book"),): 1,
+        (("kind", "trade"),): 1,
+    }
