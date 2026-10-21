@@ -91,6 +91,8 @@ services:
       - "4318:4318"   # OTLP over HTTP
     volumes:
       - ./observability/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro
+      - ./observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/paper-exchange.yaml:ro
+      - ./observability/dashboards:/otel-lgtm/dashboards/paper-exchange:ro
 
   redpanda-config:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.5

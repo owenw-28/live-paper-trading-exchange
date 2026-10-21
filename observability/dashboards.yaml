@@ -1,0 +1,10 @@
+# Loads every dashboard JSON file in observability/dashboards/ when Grafana starts.
+apiVersion: 1
+
+providers:
+  - name: paper-exchange
+    folder: Paper Exchange
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/dashboards/paper-exchange
