@@ -67,8 +67,13 @@ class Fanout:
         for message in messages:
             if message.error():
                 logger.error("Consumer error: %s", message.error())
-            elif message.topic() == BOOK.name:
-                instrument = message.key().decode()
+                continue
+            key = message.key()
+            if key is None or message.value() is None:
+                logger.warning("Skipping message without key or value on %s", message.topic())
+                continue
+            if message.topic() == BOOK.name:
+                instrument = key.decode()
                 if instrument in latest_books:
                     coalesced.add(1, {"instrument": instrument})
                 latest_books[instrument] = message
@@ -80,10 +85,12 @@ class Fanout:
             await self._deliver("book", message)
 
     async def _deliver(self, kind: str, message: Message) -> None:
-        instrument = message.key().decode()
-        event = json.loads(message.value())
+        key, value = message.key(), message.value()
+        assert key is not None and value is not None  # handle_batch skipped any without
+        instrument = key.decode()
+        event = json.loads(value)
         text = frame(kind, event)
-        carrier = {key: value.decode() for key, value in message.headers() or []}
+        carrier = _text_headers(message)
         with tracer.start_as_current_span(
             f"fanout {kind}", context=extract(carrier), kind=SpanKind.CONSUMER
         ):
@@ -109,3 +116,14 @@ def _start_at_newest(consumer: Consumer, partitions: list[TopicPartition]) -> No
     for tp in partitions:
         tp.offset = OFFSET_END
     consumer.assign(partitions)
+
+
+def _text_headers(message: Message) -> dict[str, str]:
+    """Message headers as text. Kafka headers may arrive as a dict or a list of pairs."""
+    headers = message.headers() or []
+    pairs = headers.items() if isinstance(headers, dict) else headers
+    return {
+        key: value.decode() if isinstance(value, bytes) else value
+        for key, value in pairs
+        if value is not None
+    }

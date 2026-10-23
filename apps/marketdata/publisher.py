@@ -1,6 +1,7 @@
 """Publishes messages to Redpanda, carrying the current trace context in message headers."""
 
 import logging
+from typing import Protocol
 
 from confluent_kafka import Producer
 from opentelemetry import metrics
@@ -16,6 +17,12 @@ dropped = meter.create_counter(
 delivery_failures = meter.create_counter(
     "marketdata.delivery_failures", description="Messages the broker never acknowledged"
 )
+
+
+class MessagePublisher(Protocol):
+    """Anything that can publish a message: the real Publisher, or a fake in tests."""
+
+    def publish(self, topic: str, key: str | None, value: bytes) -> None: ...
 
 
 class Publisher:

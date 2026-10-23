@@ -34,7 +34,7 @@ async def record(seconds: float, output: Path) -> int:
         with output.open("w") as f:
             while (remaining := deadline - time.monotonic()) > 0:
                 try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                    raw = await asyncio.wait_for(ws.recv(decode=True), timeout=remaining)
                 except TimeoutError:
                     break
                 f.write(raw + "\n")

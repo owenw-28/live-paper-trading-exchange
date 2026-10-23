@@ -1,4 +1,6 @@
-from confluent_kafka import TopicPartition
+from typing import cast
+
+from confluent_kafka import Consumer, TopicPartition
 
 from apps.marketdata.archive import Archive, LocalSegmentStore, read_segment, segment_range
 from apps.marketdata.archiver import Archiver
@@ -132,7 +134,7 @@ def run_archiver(tmp_path, messages):
     store = LocalSegmentStore(tmp_path)
     ref: list = []
     consumer = FakeConsumer(ref, messages, store)
-    archiver = Archiver(consumer, "marketdata.kraken.raw", Archive(store))
+    archiver = Archiver(cast(Consumer, consumer), "marketdata.kraken.raw", Archive(store))
     ref.append(archiver)
     archiver.run()
     return consumer

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from websockets.asyncio.client import connect
+from websockets.typing import Origin
 
 SNAPSHOT_GRACE_S = 1.0  # frames in the first second after connecting are the snapshot
 
@@ -31,7 +32,7 @@ class ClientStats:
 
 async def run_client(url: str, origin: str, deadline: float, stats: ClientStats) -> None:
     try:
-        async with connect(url, origin=origin, open_timeout=10) as ws:
+        async with connect(url, origin=Origin(origin), open_timeout=10) as ws:
             connected_at = time.monotonic()
             while (remaining := deadline - time.monotonic()) > 0:
                 try:

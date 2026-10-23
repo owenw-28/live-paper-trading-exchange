@@ -19,7 +19,7 @@ from apps.marketdata.kraken import (
     subscribe_message,
     unsubscribe_message,
 )
-from apps.marketdata.publisher import Publisher
+from apps.marketdata.publisher import MessagePublisher
 from apps.marketdata.topics import BOOK, KRAKEN_RAW, TRADES, instrument_key
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class KrakenIngestor:
     def __init__(
         self,
         symbols: list[str],
-        publisher: Publisher,
+        publisher: MessagePublisher,
         depth: int = 10,
         url: str = URL,
         stale_after: float = 10.0,
@@ -101,7 +101,7 @@ class KrakenIngestor:
             await ws.send(subscribe_message("trade", self.symbols))
             while True:
                 try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=self.stale_after)
+                    raw = await asyncio.wait_for(ws.recv(decode=True), timeout=self.stale_after)
                 except TimeoutError:
                     raise StaleFeedError(f"no message for {self.stale_after}s") from None
                 self._last_message_at = time.monotonic()

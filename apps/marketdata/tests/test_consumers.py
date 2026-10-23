@@ -1,8 +1,9 @@
 import asyncio
 import json
+from typing import Any
 
 import pytest
-from channels.layers import get_channel_layer
+from channels.layers import BaseChannelLayer, get_channel_layer
 from channels.routing import URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from channels.testing import WebsocketCommunicator
@@ -24,8 +25,15 @@ def in_memory_channel_layer(settings):
     settings.ALLOWED_HOSTS = ["localhost"]
 
 
-def app(live: LiveState):
-    return URLRouter([path("ws/market/", MarketDataConsumer.as_asgi(live=live))])
+def app(live: LiveState) -> URLRouter:
+    routes: list[Any] = [path("ws/market/", MarketDataConsumer.as_asgi(live=live))]  # type: ignore[arg-type]
+    return URLRouter(routes)
+
+
+def layer() -> BaseChannelLayer:
+    channel_layer = get_channel_layer()
+    assert channel_layer is not None
+    return channel_layer
 
 
 def book_message(n: int) -> dict:
@@ -49,7 +57,7 @@ def test_client_gets_snapshot_then_live_updates():
         communicator = WebsocketCommunicator(app(live), "/ws/market/?symbols=BTC/USD")
         connected, _ = await communicator.connect()
         snapshot = await receive_json(communicator)
-        await get_channel_layer().group_send(group_name(BTC), book_message(1))
+        await layer().group_send(group_name(BTC), book_message(1))
         update = await receive_json(communicator)
         await communicator.disconnect()
         return connected, snapshot, update
@@ -67,8 +75,8 @@ def test_burst_of_books_is_conflated_to_the_newest():
         communicator = WebsocketCommunicator(app(live), "/ws/market/?symbols=BTC/USD")
         await communicator.connect()
         for n in range(50):
-            await get_channel_layer().group_send(group_name(BTC), book_message(n))
-        received = []
+            await layer().group_send(group_name(BTC), book_message(n))
+        received: list[int] = []
         while not received or received[-1] != 49:
             received.append((await receive_json(communicator))["data"]["n"])
         await communicator.disconnect()

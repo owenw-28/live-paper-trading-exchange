@@ -39,10 +39,12 @@ class Archiver:
                 if message.error():
                     logger.error("Consumer error: %s", message.error())
                     continue
+                partition, offset, value = message.partition(), message.offset(), message.value()
+                if partition is None or offset is None or value is None:
+                    logger.warning("Skipping message without partition, offset or value")
+                    continue
                 _, timestamp_ms = message.timestamp()
-                segment = self.archive.append(
-                    message.partition(), message.offset(), timestamp_ms, message.value()
-                )
+                segment = self.archive.append(partition, offset, timestamp_ms, value)
                 if segment is not None:
                     self._committed(segment)
             for segment in self.archive.finish_due():

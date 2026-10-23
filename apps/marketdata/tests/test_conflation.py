@@ -23,6 +23,7 @@ def test_books_are_rate_limited_per_instrument():
     frames, wait = queue.drain(now=10.04)
 
     assert [f.text for f in frames] == ["eth first"]
+    assert wait is not None
     assert abs(wait - 0.06) < 1e-9
     assert [f.text for f in queue.drain(now=10.1)[0]] == ["too soon"]
 

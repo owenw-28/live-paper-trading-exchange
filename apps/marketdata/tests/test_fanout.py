@@ -1,20 +1,21 @@
 import asyncio
 import json
+from typing import cast
 
 from channels.layers import InMemoryChannelLayer
-from confluent_kafka import OFFSET_END, TopicPartition
+from confluent_kafka import OFFSET_END, Consumer, Message, TopicPartition
 from fakeredis import FakeAsyncRedis
 from opentelemetry import trace
 from opentelemetry.propagate import inject
 
-from apps.marketdata.fanout import Fanout, _start_at_newest
+from apps.marketdata.fanout import Fanout, _start_at_newest, _text_headers
 from apps.marketdata.live import LiveState, group_name
 
 BTC = "kraken:BTC/USD"
 
 
 class FakeMessage:
-    def __init__(self, topic: str, key: str, event: dict, headers=None) -> None:
+    def __init__(self, topic: str, key: str | None, event: dict, headers=None) -> None:
         self._topic, self._key, self._headers = topic, key, headers
         self._value = json.dumps(event).encode()
 
@@ -24,8 +25,8 @@ class FakeMessage:
     def topic(self) -> str:
         return self._topic
 
-    def key(self) -> bytes:
-        return self._key.encode()
+    def key(self) -> bytes | None:
+        return None if self._key is None else self._key.encode()
 
     def value(self) -> bytes:
         return self._value
@@ -49,7 +50,8 @@ async def deliver(messages) -> tuple[list[dict], LiveState]:
     channel = await layer.new_channel()
     await layer.group_add(group_name(BTC), channel)
     live = LiveState(FakeAsyncRedis(decode_responses=True))
-    await Fanout(consumer=None, live=live, channel_layer=layer).handle_batch(messages)
+    fanout = Fanout(consumer=cast(Consumer, None), live=live, channel_layer=layer)
+    await fanout.handle_batch(messages)  # handle_batch never touches the consumer
     received = []
     while True:
         try:
@@ -104,7 +106,7 @@ def test_assigned_partitions_start_at_the_newest_message():
             self.assigned = partitions
 
     consumer = FakeConsumer()
-    _start_at_newest(consumer, [TopicPartition("marketdata.book", 4, 1234)])
+    _start_at_newest(cast(Consumer, consumer), [TopicPartition("marketdata.book", 4, 1234)])
 
     assert [(tp.partition, tp.offset) for tp in consumer.assigned] == [(4, OFFSET_END)]
 
@@ -116,3 +118,19 @@ def test_fanout_records_ingest_to_broadcast_latency(histogram_counts):
         (("kind", "book"),): 1,
         (("kind", "trade"),): 1,
     }
+
+
+def test_message_without_key_is_skipped_not_fatal():
+    keyless = FakeMessage("marketdata.book", None, {"ingested_at_ns": 1})
+
+    received, _ = asyncio.run(deliver([keyless, book(1)]))
+
+    assert [json.loads(m["frame"])["data"]["n"] for m in received] == [1]
+
+
+def test_headers_are_read_as_text_in_either_kafka_shape():
+    as_list = FakeMessage("t", BTC, {}, [("traceparent", b"00-abc"), ("empty", None)])
+    as_dict = FakeMessage("t", BTC, {}, {"traceparent": "00-abc"})
+
+    assert _text_headers(cast(Message, as_list)) == {"traceparent": "00-abc"}
+    assert _text_headers(cast(Message, as_dict)) == {"traceparent": "00-abc"}

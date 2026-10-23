@@ -2,6 +2,7 @@
 Channels group each instrument's updates are broadcast to."""
 
 import json
+from typing import cast
 
 import redis.asyncio as redis
 
@@ -38,8 +39,8 @@ class LiveState:
 
     async def snapshot(self, instrument: str) -> list[str]:
         """Frames a newly connected client needs: recent trades oldest first, then the book."""
-        trades = await self.redis.lrange(_trades_key(instrument), 0, -1)
-        book = await self.redis.get(_book_key(instrument))
+        trades = cast(list[str], await self.redis.lrange(_trades_key(instrument), 0, -1))
+        book = cast(str | None, await self.redis.get(_book_key(instrument)))
         return list(reversed(trades)) + ([book] if book is not None else [])
 
 

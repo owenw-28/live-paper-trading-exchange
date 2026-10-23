@@ -24,10 +24,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "daphne>=4.2.3",
+    "django-stubs[compatible-mypy]>=6.1.2",
     "fakeredis>=2.40.0",
+    "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
     "ruff>=0.17.1",
+    "types-channels>=4.3.0.20260518",
 ]
 
 [tool.pytest.ini_options]
@@ -41,3 +44,17 @@ extend-exclude = ["**/migrations/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "DJ"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["apps", "config", "scripts", "conftest.py"]
+check_untyped_defs = true
+warn_unused_ignores = true
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[[tool.mypy.overrides]]
+module = "config.settings"
+disable_error_code = ["var-annotated"]

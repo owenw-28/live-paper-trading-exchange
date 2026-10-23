@@ -10,7 +10,7 @@ from dataclasses import dataclass
 class Frame:
     kind: str
     text: str
-    ingested_at_ns: int | None = None
+    ingested_at_ns: int
 
 
 class ClientQueue:
