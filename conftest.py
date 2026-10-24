@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import cache
 from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -18,6 +19,13 @@ def pytest_configure(config):
     trace.set_tracer_provider(provider)
     metrics.set_meter_provider(MeterProvider(metric_readers=[_metric_reader]))
     instrument_libraries()
+
+
+@pytest.fixture(autouse=True)
+def local_memory_cache(settings):
+    """Tests don't need Redis: rate-limit counters live in memory, fresh for each test."""
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    cache.clear()  # in-memory cache is shared across the whole process
 
 
 @pytest.fixture

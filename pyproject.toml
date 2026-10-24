@@ -8,6 +8,7 @@ dependencies = [
     "channels-redis>=4.3.0",
     "confluent-kafka>=2.16.0",
     "django>=5.2,<5.3",
+    "djangorestframework>=3.18.3",
     "environs[django]>=15.2.0",
     "opentelemetry-exporter-otlp-proto-http>=1.45.1",
     "opentelemetry-instrumentation-django[asgi]>=0.66b1",
@@ -25,6 +26,7 @@ dependencies = [
 dev = [
     "daphne>=4.2.3",
     "django-stubs[compatible-mypy]>=6.1.2",
+    "djangorestframework-stubs>=3.18.1",
     "fakeredis>=2.40.0",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
@@ -50,7 +52,7 @@ python_version = "3.12"
 files = ["apps", "config", "scripts", "conftest.py"]
 check_untyped_defs = true
 warn_unused_ignores = true
-plugins = ["mypy_django_plugin.main"]
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
