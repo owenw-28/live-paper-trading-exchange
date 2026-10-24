@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from decimal import Decimal
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -28,6 +29,8 @@ KAFKA_BOOTSTRAP_SERVERS = env.str("KAFKA_BOOTSTRAP_SERVERS", default="localhost:
 KAFKA_REPLICATION_FACTOR = env.int("KAFKA_REPLICATION_FACTOR", default=1)
 MARKETDATA_SYMBOLS = env.list("MARKETDATA_SYMBOLS", default=["BTC/USD", "ETH/USD"])
 MARKETDATA_MAX_BOOKS_PER_SECOND = env.float("MARKETDATA_MAX_BOOKS_PER_SECOND", default=10.0)
+TRADING_FEE_RATE = Decimal("0.0025")
+MARKET_BUY_PRICE_BUFFER = Decimal("0.02")
 REDIS_URL = env.str("REDIS_URL", default="redis://localhost:6379/0")
 ARCHIVE_ROOT = env.path("ARCHIVE_ROOT", default=BASE_DIR / "archive")
 ARCHIVE_SEGMENT_SECONDS = env.float("ARCHIVE_SEGMENT_SECONDS", default=60.0)
@@ -47,6 +50,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.accounts",
     "apps.ledger",
+    "apps.trading",
 ]
 
 MIDDLEWARE = [
@@ -99,7 +103,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"signup": "5/hour", "login": "10/minute"},
+    "DEFAULT_THROTTLE_RATES": {"signup": "5/hour", "login": "10/minute", "orders": "60/minute"},
     "NUM_PROXIES": 1,
 }
 

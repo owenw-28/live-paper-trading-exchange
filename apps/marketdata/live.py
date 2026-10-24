@@ -29,7 +29,7 @@ class LiveState:
         return cls(redis.from_url(url, decode_responses=True))
 
     async def save_book(self, instrument: str, text: str) -> None:
-        await self.redis.set(_book_key(instrument), text, ex=BOOK_TTL_S)
+        await self.redis.set(book_key(instrument), text, ex=BOOK_TTL_S)
 
     async def save_trade(self, instrument: str, text: str) -> None:
         async with self.redis.pipeline(transaction=False) as pipe:
@@ -40,11 +40,11 @@ class LiveState:
     async def snapshot(self, instrument: str) -> list[str]:
         """Frames a newly connected client needs: recent trades oldest first, then the book."""
         trades = cast(list[str], await self.redis.lrange(_trades_key(instrument), 0, -1))
-        book = cast(str | None, await self.redis.get(_book_key(instrument)))
+        book = cast(str | None, await self.redis.get(book_key(instrument)))
         return list(reversed(trades)) + ([book] if book is not None else [])
 
 
-def _book_key(instrument: str) -> str:
+def book_key(instrument: str) -> str:
     return f"live:book:{instrument}"
 
 
