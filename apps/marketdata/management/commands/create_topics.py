@@ -3,6 +3,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from apps.marketdata.topics import ALL_TOPICS
+from apps.trading.topics import ALL_TRADING_TOPICS
 
 
 class Command(BaseCommand):
@@ -18,7 +19,7 @@ class Command(BaseCommand):
                 replication_factor=settings.KAFKA_REPLICATION_FACTOR,
                 config={"retention.ms": str(topic.retention_ms)},
             )
-            for topic in ALL_TOPICS
+            for topic in [*ALL_TOPICS, *ALL_TRADING_TOPICS]
             if topic.name not in existing
         ]
         if not missing:

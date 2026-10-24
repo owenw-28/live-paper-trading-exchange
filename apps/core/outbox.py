@@ -2,10 +2,12 @@
 
 from django.db import connection
 from django.utils import timezone
+from opentelemetry.propagate import inject
 
 from apps.core.models import OutboxEvent
 
 SCHEMA_VERSION = 1
+CHANNEL = "outbox"
 
 
 def enqueue(topic: str, key: str, event_type: str, data: dict) -> OutboxEvent:
@@ -20,5 +22,8 @@ def enqueue(topic: str, key: str, event_type: str, data: dict) -> OutboxEvent:
         "occurred_at": timezone.now().isoformat(),
         "data": data,
     }
+    inject(event.headers)
     event.save()
+    with connection.cursor() as cursor:
+        cursor.execute(f"NOTIFY {CHANNEL}")
     return event

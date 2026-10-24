@@ -8,6 +8,7 @@ class OutboxEvent(models.Model):
     topic = models.CharField(max_length=100)
     key = models.CharField(max_length=100)
     payload = models.JSONField()
+    headers = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     published_at = models.DateTimeField(null=True, blank=True)
 

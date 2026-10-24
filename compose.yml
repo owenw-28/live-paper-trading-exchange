@@ -141,6 +141,10 @@ services:
   fanout:
     <<: *app
     command: ["python", "manage.py", "run_fanout"]
+  
+  relay:
+    <<: *app
+    command: ["python", "manage.py", "run_relay"]
 
   caddy:
     build: ./frontend
