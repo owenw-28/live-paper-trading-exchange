@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -50,9 +51,10 @@ class FakeConsumer:
 
 def service(messages):
     consumer = FakeConsumer(messages)
-    svc = SettlementService(cast(Consumer, consumer))
+    pushed: list = []
+    svc = SettlementService(cast(Consumer, consumer), notify=pushed.append)
     svc.start()
-    return svc, consumer
+    return svc, consumer, pushed
 
 
 def test_offsets_are_committed_after_the_batch_is_settled(monkeypatch):
@@ -60,7 +62,7 @@ def test_offsets_are_committed_after_the_batch_is_settled(monkeypatch):
     monkeypatch.setattr(
         settlement_service, "settle", lambda event: settled.append(event["data"]["order_id"])
     )
-    svc, consumer = service([FakeMessage(5), FakeMessage(9, partition=2), FakeMessage(6)])
+    svc, consumer, _ = service([FakeMessage(5), FakeMessage(9, partition=2), FakeMessage(6)])
 
     assert svc.step() == 3
 
@@ -73,9 +75,23 @@ def test_a_database_failure_commits_nothing(monkeypatch):
         raise RuntimeError("database down")
 
     monkeypatch.setattr(settlement_service, "settle", broken)
-    svc, consumer = service([FakeMessage(5)])
+    svc, consumer, _ = service([FakeMessage(5)])
 
     with pytest.raises(RuntimeError):
         svc.step()
 
     assert consumer.commits == []
+
+
+def test_only_applied_outcomes_are_pushed_to_the_user(monkeypatch):
+    applied = SimpleNamespace(id=5, settled_at=None)
+    monkeypatch.setattr(
+        settlement_service,
+        "settle",
+        lambda event: applied if event["data"]["order_id"] == 5 else None,
+    )
+    svc, _, pushed = service([FakeMessage(5), FakeMessage(6)])
+
+    svc.step()
+
+    assert pushed == [applied]  # order 6 was a repeat: nothing changed, nothing to tell

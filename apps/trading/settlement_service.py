@@ -7,6 +7,7 @@ All state is in Postgres, so several copies can run in one consumer group; no le
 
 import json
 import logging
+from collections.abc import Callable
 
 from confluent_kafka import Consumer, Message, TopicPartition
 from opentelemetry import metrics, trace
@@ -14,6 +15,8 @@ from opentelemetry.propagate import extract
 from opentelemetry.trace import SpanKind
 
 from apps.core.kafka import text_headers
+from apps.trading.models import Order
+from apps.trading.notifications import notify_user
 from apps.trading.settlement import settle
 from apps.trading.topics import ORDER_EVENTS
 
@@ -34,8 +37,9 @@ order_latency = meter.create_histogram(
 
 
 class SettlementService:
-    def __init__(self, consumer: Consumer) -> None:
+    def __init__(self, consumer: Consumer, notify: Callable[[Order], None] = notify_user) -> None:
         self.consumer = consumer
+        self.notify = notify
 
     def start(self) -> None:
         self.consumer.subscribe([ORDER_EVENTS.name])
@@ -75,6 +79,7 @@ class SettlementService:
             skipped_counter.add(1, {"type": event["type"]})
             return
         applied_counter.add(1, {"type": event["type"]})
+        self.notify(order)  # settle() has committed, so the browser never hears of a rollback
         if order.settled_at is not None:
             order_latency.record(
                 (order.settled_at - order.created_at).total_seconds(),

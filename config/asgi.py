@@ -25,13 +25,14 @@ from channels.auth import AuthMiddlewareStack  # noqa: E402
 from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
 from channels.security.websocket import AllowedHostsOriginValidator  # noqa: E402
 
-from apps.marketdata.routing import websocket_urlpatterns  # noqa: E402
+from apps.marketdata.routing import websocket_urlpatterns as market_routes  # noqa: E402
+from apps.trading.routing import websocket_urlpatterns as user_routes  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
         "http": django_application,
         "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
+            AuthMiddlewareStack(URLRouter(market_routes + user_routes))
         ),
     }
 )
