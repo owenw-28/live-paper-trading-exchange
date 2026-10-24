@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.marketdata",
     "rest_framework",
     "apps.accounts",
+    "apps.ledger",
 ]
 
 MIDDLEWARE = [

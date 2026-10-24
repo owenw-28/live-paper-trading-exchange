@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import status
@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.serializers import CredentialsSerializer, SignUpSerializer, UserSerializer
+from apps.ledger.services import fund_new_user
 
 
 @method_decorator(ensure_csrf_cookie, name="get")
@@ -31,10 +32,12 @@ class SignUpView(APIView):
         serializer = SignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            user = User.objects.create_user(
-                username=serializer.validated_data["username"],
-                password=serializer.validated_data["password"],
-            )
+            with transaction.atomic():  # a user always exists together with their starting balance
+                user = User.objects.create_user(
+                    username=serializer.validated_data["username"],
+                    password=serializer.validated_data["password"],
+                )
+                fund_new_user(user)
         except IntegrityError:  # someone took the name between our check and the insert
             return Response(
                 {"username": ["That username is taken."]}, status=status.HTTP_400_BAD_REQUEST
