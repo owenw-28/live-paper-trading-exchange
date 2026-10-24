@@ -65,6 +65,26 @@ describe('api', () => {
     expect((error as ApiError).messages()).toEqual(['Taken.', 'Too short.'])
   })
 
+  it('keeps the machine-readable code out of the messages', async () => {
+    fetchMock.mockResolvedValue(
+      respond(503, { detail: 'No live prices right now.', code: 'market_unavailable' }),
+    )
+
+    const error = (await api('/api/orders').catch((e: unknown) => e)) as ApiError
+
+    expect(error.messages()).toEqual(['No live prices right now.'])
+    expect(error.code).toBe('market_unavailable')
+  })
+
+  it('sends extra headers', async () => {
+    fetchMock.mockResolvedValue(respond(201, {}))
+
+    await api('/api/orders', { method: 'POST', body: {}, headers: { 'Idempotency-Key': 'k-123' } })
+
+    const [, init] = fetchMock.mock.calls.at(-1) ?? []
+    expect(init.headers['Idempotency-Key']).toBe('k-123')
+  })
+
   it('returns undefined for 204 No Content', async () => {
     fetchMock.mockResolvedValue(respond(204))
 
