@@ -8,6 +8,7 @@ import redis.asyncio as redis
 
 BOOK_TTL_S = 30
 RECENT_TRADES = 50
+DISPLAY_DEPTH = 10  # levels per side sent to browsers; full book stays server-side
 
 
 def frame(kind: str, event: dict) -> str:
@@ -31,6 +32,10 @@ class LiveState:
     async def save_book(self, instrument: str, text: str) -> None:
         await self.redis.set(book_key(instrument), text, ex=BOOK_TTL_S)
 
+    async def save_depth(self, instrument: str, event: str) -> None:
+        """The full-depth book event, for pricing orders."""
+        await self.redis.set(depth_key(instrument), event, ex=BOOK_TTL_S)
+
     async def save_trade(self, instrument: str, text: str) -> None:
         async with self.redis.pipeline(transaction=False) as pipe:
             pipe.lpush(_trades_key(instrument), text)
@@ -46,6 +51,10 @@ class LiveState:
 
 def book_key(instrument: str) -> str:
     return f"live:book:{instrument}"
+
+
+def depth_key(instrument: str) -> str:
+    return f"live:depth:{instrument}"
 
 
 def _trades_key(instrument: str) -> str:

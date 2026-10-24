@@ -1,9 +1,10 @@
+import json
 import time
 from decimal import Decimal
 
 from fakeredis import FakeRedis
 
-from apps.marketdata.live import book_key, frame
+from apps.marketdata.live import depth_key
 from apps.trading import market
 
 
@@ -14,7 +15,7 @@ def store_book(redis: FakeRedis, age_s: float) -> None:
         "asks": [["100.0", "0.5"], ["100.1", "2.0"]],
         "ingested_at_ns": time.time_ns() - int(age_s * 1e9),
     }
-    redis.set(book_key("kraken:BTC/USD"), frame("book", event))
+    redis.set(depth_key("kraken:BTC/USD"), json.dumps(event))
 
 
 def test_reads_fresh_asks_as_decimals(monkeypatch):

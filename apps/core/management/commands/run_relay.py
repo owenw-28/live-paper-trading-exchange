@@ -1,7 +1,5 @@
 import signal
-import time
 
-import psycopg
 from confluent_kafka import Producer
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -9,6 +7,7 @@ from opentelemetry import metrics
 from opentelemetry.metrics import CallbackOptions, Observation
 
 from apps.core import outbox, relay
+from apps.core.leadership import dedicated_connection, wait_to_lead
 from config.telemetry import configure_telemetry
 
 
@@ -43,9 +42,8 @@ class Command(BaseCommand):
         publisher = relay.Relay(producer)
         # A dedicated connection, outside Django's pool: it holds the leader lock and listens for
         # NOTIFY. If this process dies, the connection drops and Postgres frees the lock.
-        with psycopg.connect(**_conninfo(), autocommit=True) as listener:
-            self._wait_for_leadership(listener)
-            if self.stopping:
+        with dedicated_connection() as listener:
+            if not wait_to_lead(listener, relay.LEADER_LOCK_ID, self._is_stopping, self._standby):
                 return
             listener.execute(f"LISTEN {outbox.CHANNEL}")
             self.stdout.write("Leader: publishing outbox events")
@@ -57,29 +55,14 @@ class Command(BaseCommand):
         producer.flush(10)
         self.stdout.write("Relay stopped")
 
-    def _wait_for_leadership(self, listener: psycopg.Connection) -> None:
-        while not self.stopping:
-            row = listener.execute(
-                "SELECT pg_try_advisory_lock(%s)", (relay.LEADER_LOCK_ID,)
-            ).fetchone()
-            if row is not None and row[0]:
-                return
-            self.stdout.write("Standby: another relay is active")
-            time.sleep(2)
-
     def _stop(self, *args) -> None:
         self.stopping = True
 
+    def _is_stopping(self) -> bool:
+        return self.stopping
+
+    def _standby(self) -> None:
+        self.stdout.write("Standby: another relay is active")
+
     def _observe_age(self, options: CallbackOptions):
         yield Observation(relay.oldest_unpublished_age_s())
-
-
-def _conninfo() -> dict:
-    db = settings.DATABASES["default"]
-    return {
-        "dbname": db["NAME"],
-        "user": db["USER"],
-        "password": db["PASSWORD"],
-        "host": db["HOST"],
-        "port": db["PORT"],
-    }

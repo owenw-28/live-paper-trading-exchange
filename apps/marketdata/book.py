@@ -5,6 +5,9 @@ from decimal import Decimal
 
 Level = dict[str, Decimal]
 
+# Kraken's checksum covers only the top 10 levels of each side, whatever depth is subscribed.
+CHECKSUM_LEVELS = 10
+
 
 class OrderBook:
     def __init__(self, symbol: str, depth: int = 10) -> None:
@@ -31,7 +34,7 @@ class OrderBook:
         return sorted(self.asks.items())[: self.depth]
 
     def checksum(self) -> int:
-        levels = self.top_asks() + self.top_bids()
+        levels = self.top_asks()[:CHECKSUM_LEVELS] + self.top_bids()[:CHECKSUM_LEVELS]
         payload = "".join(checksum_digits(price) + checksum_digits(qty) for price, qty in levels)
         return zlib.crc32(payload.encode())
 

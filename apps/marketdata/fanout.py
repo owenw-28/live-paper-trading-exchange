@@ -14,8 +14,9 @@ from opentelemetry import metrics, trace
 from opentelemetry.propagate import extract
 from opentelemetry.trace import SpanKind
 
+from apps.core.kafka import text_headers
 from apps.marketdata.latency import LATENCY_BUCKETS_S
-from apps.marketdata.live import LiveState, frame, group_name
+from apps.marketdata.live import DISPLAY_DEPTH, LiveState, frame, group_name
 from apps.marketdata.topics import BOOK, TRADES
 
 logger = logging.getLogger(__name__)
@@ -89,13 +90,24 @@ class Fanout:
         assert key is not None and value is not None  # handle_batch skipped any without
         instrument = key.decode()
         event = json.loads(value)
-        text = frame(kind, event)
-        carrier = _text_headers(message)
+        if kind == "book":  # browsers only show the top of the book
+            text = frame(
+                kind,
+                {
+                    **event,
+                    "bids": event["bids"][:DISPLAY_DEPTH],
+                    "asks": event["asks"][:DISPLAY_DEPTH],
+                },
+            )
+        else:
+            text = frame(kind, event)
+        carrier = text_headers(message)
         with tracer.start_as_current_span(
             f"fanout {kind}", context=extract(carrier), kind=SpanKind.CONSUMER
         ):
             if kind == "book":
                 await self.live.save_book(instrument, text)
+                await self.live.save_depth(instrument, value.decode())
             else:
                 await self.live.save_trade(instrument, text)
             await self.channel_layer.group_send(
@@ -116,14 +128,3 @@ def _start_at_newest(consumer: Consumer, partitions: list[TopicPartition]) -> No
     for tp in partitions:
         tp.offset = OFFSET_END
     consumer.assign(partitions)
-
-
-def _text_headers(message: Message) -> dict[str, str]:
-    """Message headers as text. Kafka headers may arrive as a dict or a list of pairs."""
-    headers = message.headers() or []
-    pairs = headers.items() if isinstance(headers, dict) else headers
-    return {
-        key: value.decode() if isinstance(value, bytes) else value
-        for key, value in pairs
-        if value is not None
-    }

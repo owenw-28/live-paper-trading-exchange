@@ -8,8 +8,9 @@ from fakeredis import FakeAsyncRedis
 from opentelemetry import trace
 from opentelemetry.propagate import inject
 
-from apps.marketdata.fanout import Fanout, _start_at_newest, _text_headers
-from apps.marketdata.live import LiveState, group_name
+from apps.core.kafka import text_headers
+from apps.marketdata.fanout import Fanout, _start_at_newest
+from apps.marketdata.live import LiveState, depth_key, group_name
 
 BTC = "kraken:BTC/USD"
 
@@ -36,7 +37,8 @@ class FakeMessage:
 
 
 def book(n: int) -> FakeMessage:
-    return FakeMessage("marketdata.book", BTC, {"symbol": "BTC/USD", "n": n, "ingested_at_ns": n})
+    event = {"symbol": "BTC/USD", "n": n, "bids": [], "asks": [], "ingested_at_ns": n}
+    return FakeMessage("marketdata.book", BTC, event)
 
 
 def trade(n: int) -> FakeMessage:
@@ -91,7 +93,9 @@ def test_fanout_continues_the_ingestors_trace(finished_spans):
         carrier: dict[str, str] = {}
         inject(carrier)
     headers = [(key, value.encode()) for key, value in carrier.items()]
-    message = FakeMessage("marketdata.book", BTC, {"ingested_at_ns": 1}, headers)
+    message = FakeMessage(
+        "marketdata.book", BTC, {"bids": [], "asks": [], "ingested_at_ns": 1}, headers
+    )
 
     asyncio.run(deliver([message]))
 
@@ -121,7 +125,7 @@ def test_fanout_records_ingest_to_broadcast_latency(histogram_counts):
 
 
 def test_message_without_key_is_skipped_not_fatal():
-    keyless = FakeMessage("marketdata.book", None, {"ingested_at_ns": 1})
+    keyless = FakeMessage("marketdata.book", None, {"bids": [], "asks": [], "ingested_at_ns": 1})
 
     received, _ = asyncio.run(deliver([keyless, book(1)]))
 
@@ -132,5 +136,20 @@ def test_headers_are_read_as_text_in_either_kafka_shape():
     as_list = FakeMessage("t", BTC, {}, [("traceparent", b"00-abc"), ("empty", None)])
     as_dict = FakeMessage("t", BTC, {}, {"traceparent": "00-abc"})
 
-    assert _text_headers(cast(Message, as_list)) == {"traceparent": "00-abc"}
-    assert _text_headers(cast(Message, as_dict)) == {"traceparent": "00-abc"}
+    assert text_headers(cast(Message, as_list)) == {"traceparent": "00-abc"}
+    assert text_headers(cast(Message, as_dict)) == {"traceparent": "00-abc"}
+
+
+def test_browsers_get_ten_levels_but_the_full_book_is_kept_for_pricing():
+    levels = [[str(100 + n), "1"] for n in range(15)]
+    event = {"symbol": "BTC/USD", "bids": levels, "asks": levels, "ingested_at_ns": 1}
+
+    async def scenario():
+        received, live = await deliver([FakeMessage("marketdata.book", BTC, event)])
+        return received, await live.redis.get(depth_key(BTC))
+
+    received, stored = asyncio.run(scenario())
+
+    shown = json.loads(received[0]["frame"])["data"]
+    assert len(shown["bids"]) == len(shown["asks"]) == 10
+    assert len(json.loads(stored)["asks"]) == 15

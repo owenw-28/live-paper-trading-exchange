@@ -15,7 +15,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         configure_telemetry(service_name="ingestor")
         publisher = Publisher(settings.KAFKA_BOOTSTRAP_SERVERS)
-        ingestor = KrakenIngestor(symbols=settings.MARKETDATA_SYMBOLS, publisher=publisher)
+        ingestor = KrakenIngestor(
+            symbols=settings.MARKETDATA_SYMBOLS,
+            publisher=publisher,
+            depth=settings.MARKETDATA_BOOK_DEPTH,
+        )
         try:
             asyncio.run(run_until_stopped(ingestor.run()))
         finally:

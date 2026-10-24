@@ -87,3 +87,14 @@ def test_book_is_truncated_to_depth():
 )
 def test_checksum_digits(value, expected):
     assert checksum_digits(Decimal(value)) == expected
+
+
+def test_checksum_covers_only_the_top_ten_levels_at_any_depth():
+    bids = [level(str(1000 - n), "1") for n in range(15)]
+    asks = [level(str(1001 + n), "1") for n in range(15)]
+    deep, shallow = OrderBook("BTC/USD", depth=100), OrderBook("BTC/USD", depth=10)
+    deep.apply_snapshot(bids, asks)
+    shallow.apply_snapshot(bids, asks)
+
+    assert len(deep.top_bids()) == 15
+    assert deep.checksum() == shallow.checksum()
