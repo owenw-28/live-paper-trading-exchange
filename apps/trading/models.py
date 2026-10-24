@@ -41,6 +41,12 @@ class Order(models.Model):
     reserved_asset = models.CharField(max_length=8, choices=Asset.choices)
     reserved_amount = models.DecimalField(max_digits=24, decimal_places=8)
     cancel_requested = models.BooleanField(default=False)
+    # Set by settlement when the order fills (quote amounts in the quote asset, e.g. USD).
+    average_price = models.DecimalField(max_digits=24, decimal_places=8, null=True, blank=True)
+    quote_amount = models.DecimalField(max_digits=24, decimal_places=8, null=True, blank=True)
+    fee = models.DecimalField(max_digits=24, decimal_places=8, null=True, blank=True)
+    reject_reason = models.CharField(max_length=32, blank=True)
+    settled_at = models.DateTimeField(null=True, blank=True)  # when it reached a final status
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

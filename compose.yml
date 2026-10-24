@@ -150,6 +150,10 @@ services:
     <<: *app
     command: ["python", "manage.py", "run_engine"]
 
+  settlement:
+    <<: *app
+    command: ["python", "manage.py", "run_settlement"]
+
   caddy:
     build: ./frontend
     image: paper-exchange-frontend

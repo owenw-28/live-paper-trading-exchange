@@ -50,8 +50,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "limit_price",
             "status",
             "filled_quantity",
+            "average_price",
+            "quote_amount",
+            "fee",
+            "reject_reason",
             "reserved_asset",
             "reserved_amount",
             "cancel_requested",
             "created_at",
+            "settled_at",
         ]
